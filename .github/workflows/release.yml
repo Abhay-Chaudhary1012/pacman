@@ -1,0 +1,69 @@
+name: Build & Release PacMan
+
+on:
+  push:
+    tags:
+      - 'v*'          # triggers on v1.0.0, v1.2.3, etc.
+
+permissions:
+  contents: write     # needed to create GitHub Releases
+
+jobs:
+  build-and-release:
+    name: Build JAR & Publish Release
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout source ──────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Set up Java 21 ───────────────────────────────────────────
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # ── 3. Compile sources ──────────────────────────────────────────
+      - name: Compile
+        run: |
+          mkdir -p bin
+          javac -d bin src/App.java src/PacMan.java
+
+      # ── 4. Copy assets into bin ─────────────────────────────────────
+      - name: Copy assets
+        run: cp -r src/assets bin/assets
+
+      # ── 5. Package runnable JAR ─────────────────────────────────────
+      - name: Package JAR
+        run: jar cfm PacMan.jar MANIFEST.MF -C bin .
+
+      # ── 6. Create GitHub Release & upload JAR ───────────────────────
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "PacMan ${{ github.ref_name }}"
+          body: |
+            ## 🎮 PacMan — Java Edition ${{ github.ref_name }}
+
+            ### Download & Play
+            1. Download **PacMan.jar** below
+            2. Make sure Java 21+ is installed → [Download Java](https://adoptium.net/)
+            3. Run: `java -jar PacMan.jar`
+               Or double-click the JAR if Java is your default handler
+
+            ### Controls
+            | Key | Action |
+            |-----|--------|
+            | ↑ Arrow Up | Move Up |
+            | ↓ Arrow Down | Move Down |
+            | ← Arrow Left | Move Left |
+            | → Arrow Right | Move Right |
+            | Any arrow (Game Over screen) | Restart |
+
+            ---
+            _Made by [@divyansh](https://github.com/divyansh)_
+          files: PacMan.jar
+          draft: false
+          prerelease: false

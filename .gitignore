@@ -1,0 +1,22 @@
+# Compiled output
+bin/
+*.class
+
+# Packaged JAR (people download from Releases, not source)
+PacMan.jar
+
+# macOS system files
+.DS_Store
+**/.DS_Store
+
+# VS Code
+.vscode/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Eclipse
+.project
+.classpath
+.settings/

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PacMan — Java Edition</title>
+  <meta name="description" content="Classic PacMan arcade game built in Java. Free to download and play."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --yellow:  #FFD700;
+      --amber:   #FFA500;
+      --dim:     #888;
+      --bg:      #080808;
+      --panel:   #0e0e0e;
+      --border:  #2a2a2a;
+      --glow:    0 0 8px #FFD700, 0 0 20px #FFA50066;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--yellow);
+      font-family: 'Press Start 2P', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+    }
+
+    /* ── scanline overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 3px,
+        rgba(0,0,0,0.18) 3px,
+        rgba(0,0,0,0.18) 4px
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* ── top bar ── */
+    header {
+      width: 100%;
+      border-bottom: 1px solid var(--border);
+      padding: 18px 0;
+      text-align: center;
+    }
+    header span {
+      font-size: 9px;
+      color: var(--dim);
+      letter-spacing: 3px;
+    }
+
+    /* ── hero ── */
+    .hero {
+      text-align: center;
+      padding: 60px 20px 30px;
+    }
+
+    .blink-cursor {
+      display: inline-block;
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .title {
+      font-size: clamp(22px, 5vw, 42px);
+      color: var(--yellow);
+      text-shadow: var(--glow);
+      letter-spacing: 4px;
+      line-height: 1.4;
+    }
+
+    .subtitle {
+      margin-top: 18px;
+      font-size: 9px;
+      color: var(--dim);
+      letter-spacing: 2px;
+    }
+
+    /* ── score ticker ── */
+    .ticker {
+      font-size: 9px;
+      color: var(--amber);
+      margin-top: 28px;
+      letter-spacing: 2px;
+      animation: flicker 6s infinite;
+    }
+    @keyframes flicker {
+      0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:0.4} 94%{opacity:1} 97%{opacity:0.7} 98%{opacity:1}
+    }
+
+    /* ── CRT video frame ── */
+    .screen-wrap {
+      position: relative;
+      width: min(720px, 94vw);
+      margin: 40px auto 0;
+      border: 3px solid #222;
+      border-radius: 6px;
+      background: #000;
+      box-shadow:
+        0 0 0 4px #111,
+        0 0 0 6px #1a1a1a,
+        0 0 40px #FFD70022,
+        inset 0 0 30px #000a;
+    }
+
+    .screen-wrap::before {
+      content: '● REC';
+      position: absolute;
+      top: 10px; right: 14px;
+      font-size: 7px;
+      color: #ff4444;
+      letter-spacing: 2px;
+      animation: recblink 2s step-end infinite;
+      z-index: 2;
+    }
+    @keyframes recblink { 50%{opacity:0} }
+
+    .screen-wrap video {
+      display: block;
+      width: 100%;
+      border-radius: 4px;
+      filter: saturate(1.1) contrast(1.05);
+    }
+
+    /* ── corner notch decorations ── */
+    .corners {
+      position: absolute;
+      inset: -8px;
+      pointer-events: none;
+    }
+    .corners span {
+      position: absolute;
+      width: 14px; height: 14px;
+      border-color: var(--yellow);
+      border-style: solid;
+      opacity: 0.6;
+    }
+    .corners span:nth-child(1){ top:0; left:0;  border-width: 2px 0 0 2px; }
+    .corners span:nth-child(2){ top:0; right:0; border-width: 2px 2px 0 0; }
+    .corners span:nth-child(3){ bottom:0; left:0;  border-width: 0 0 2px 2px; }
+    .corners span:nth-child(4){ bottom:0; right:0; border-width: 0 2px 2px 0; }
+
+    /* ── insert coin ── */
+    .insert-coin {
+      font-size: 11px;
+      color: var(--yellow);
+      margin: 48px 0 18px;
+      text-shadow: var(--glow);
+      letter-spacing: 3px;
+      animation: blink 1.2s step-end infinite;
+    }
+
+    /* ── download button ── */
+    .dl-btn {
+      display: inline-block;
+      padding: 16px 36px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 11px;
+      color: #000;
+      background: var(--yellow);
+      border: none;
+      border-radius: 2px;
+      letter-spacing: 2px;
+      cursor: pointer;
+      text-decoration: none;
+      box-shadow: var(--glow), 4px 4px 0 #a0880080;
+      transition: transform 0.08s, box-shadow 0.08s;
+      position: relative;
+      overflow: hidden;
+    }
+    .dl-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg,transparent 30%,rgba(255,255,255,0.25) 50%,transparent 70%);
+      transform: translateX(-100%);
+      transition: transform 0.4s;
+    }
+    .dl-btn:hover::after { transform: translateX(100%); }
+    .dl-btn:hover {
+      transform: translate(-2px,-2px);
+      box-shadow: var(--glow), 6px 6px 0 #a0880099;
+    }
+    .dl-btn:active { transform: translate(1px,1px); box-shadow: none; }
+
+    .dl-note {
+      margin-top: 14px;
+      font-size: 7px;
+      color: var(--dim);
+      letter-spacing: 2px;
+    }
+
+    /* ── how to play ── */
+    .section {
+      width: min(720px, 94vw);
+      margin: 60px auto 0;
+      border: 1px solid var(--border);
+      padding: 28px 24px;
+    }
+
+    .section h2 {
+      font-size: 11px;
+      color: var(--amber);
+      letter-spacing: 3px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+    }
+
+    .key-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 8px;
+      color: var(--dim);
+    }
+    .key {
+      display: inline-block;
+      padding: 5px 10px;
+      border: 1px solid #444;
+      color: var(--yellow);
+      font-size: 7px;
+      min-width: 36px;
+      text-align: center;
+      background: #111;
+      box-shadow: 0 2px 0 #333;
+    }
+
+    /* ── requirements ── */
+    .req-list {
+      list-style: none;
+      font-size: 8px;
+      color: var(--dim);
+      line-height: 2.4;
+      letter-spacing: 1px;
+    }
+    .req-list li::before { content: '▶  '; color: var(--yellow); }
+    .req-list a { color: var(--amber); text-decoration: none; }
+    .req-list a:hover { text-decoration: underline; }
+
+    /* ── footer ── */
+    footer {
+      width: 100%;
+      margin-top: 70px;
+      border-top: 1px solid var(--border);
+      padding: 28px 20px;
+      text-align: center;
+    }
+
+    .footer-score {
+      font-size: 7px;
+      color: var(--dim);
+      letter-spacing: 3px;
+      margin-bottom: 14px;
+    }
+
+    .footer-author {
+      font-size: 9px;
+      color: var(--yellow);
+      text-shadow: var(--glow);
+      letter-spacing: 3px;
+    }
+    .footer-author a {
+      color: var(--amber);
+      text-decoration: none;
+    }
+    .footer-author a:hover { text-decoration: underline; }
+
+    .footer-ghosts {
+      font-size: 20px;
+      margin-top: 14px;
+      letter-spacing: 6px;
+      animation: flicker 5s infinite;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <span>INSERT COIN TO CONTINUE</span>
+  </header>
+
+  <!-- ── Hero ── -->
+  <section class="hero">
+    <h1 class="title">PAC-MAN<span class="blink-cursor">_</span></h1>
+    <p class="subtitle">JAVA EDITION &nbsp;·&nbsp; V 1.0.0</p>
+    <p class="ticker">HIGH SCORE : 999999</p>
+  </section>
+
+  <!-- ── Video ── -->
+  <div class="screen-wrap" id="demo">
+    <div class="corners">
+      <span></span><span></span><span></span><span></span>
+    </div>
+    <video
+      src="https://res.cloudinary.com/eiss6qy0/video/upload/v1783599046/Screen_Recording_2026-07-09_at_5.38.12_PM_kst82u.mov"
+      autoplay
+      muted
+      loop
+      playsinline
+      preload="auto"
+      aria-label="PacMan gameplay demo"
+    ></video>
+  </div>
+
+  <!-- ── Download ── -->
+  <div style="text-align:center; margin-top:48px;">
+    <p class="insert-coin">▼ DOWNLOAD &amp; PLAY ▼</p>
+    <a
+      id="download-btn"
+      class="dl-btn"
+      href="https://github.com/dev-kvt/pacman/releases/latest/download/PacMan.jar"
+      download
+    >
+      ⬇ &nbsp; PacMan.jar
+    </a>
+    <p class="dl-note">Requires Java 21+ &nbsp;·&nbsp; macOS / Windows / Linux</p>
+  </div>
+
+  <!-- ── How to Play ── -->
+  <div class="section" id="how-to-play">
+    <h2>// HOW TO PLAY</h2>
+    <div class="controls-grid">
+      <div class="key-row"><span class="key">↑</span> Move Up</div>
+      <div class="key-row"><span class="key">↓</span> Move Down</div>
+      <div class="key-row"><span class="key">←</span> Move Left</div>
+      <div class="key-row"><span class="key">→</span> Move Right</div>
+      <div class="key-row"><span class="key">↑↓←→</span> Restart (Game Over)</div>
+    </div>
+  </div>
+
+  <!-- ── Requirements ── -->
+  <div class="section" id="requirements">
+    <h2>// REQUIREMENTS</h2>
+    <ul class="req-list">
+      <li>Java 21 or later — <a href="https://adoptium.net/" target="_blank" rel="noreferrer">Download Java</a></li>
+      <li>Run: <code style="color:var(--yellow)">java -jar PacMan.jar</code></li>
+      <li>Or double-click the JAR if Java is your default handler</li>
+    </ul>
+  </div>
+
+  <!-- ── Footer ── -->
+  <footer>
+    <p class="footer-author">
+      MADE BY &nbsp;<a href="https://github.com/dev-kvt" target="_blank" rel="noreferrer">@divyansh</a>
+    </p>
+  </footer>
+
+</body>
+</html>
